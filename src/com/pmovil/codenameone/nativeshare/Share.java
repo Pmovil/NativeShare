@@ -37,7 +37,7 @@ import org.bouncycastle.crypto.digests.MD5Digest;
  * 
  * Curretly supported in Android and iOS
  *
- * @author Fabrício
+ * @author Fabricio
  */
 public class Share {
     public static final int FACEBOOK = 1;
@@ -62,19 +62,43 @@ public class Share {
     }
     
     public void show(final String text, String image, final String mimeType, final int services) {
+        show(text, image, mimeType, services, null);
+    }
+    
+    public void show(final String text, String image, final String mimeType, final int services, final ActionListener callback) {
         if (image != null && image.toLowerCase().startsWith("http")) {
-            final String extension = image.substring(image.lastIndexOf("."));
-            final String file = FileSystemStorage.getInstance().getAppHomePath() + "share_" + md5(image) + extension;
-            Log.p("Fetching " + image + " to " + file);
-            ImageDownloadService.createImageToFileSystem(image, new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    Log.p(file + " fetched");
-                    peer.show(text, file, mimeType, services);
-                    // delete after share ?
+            try {
+                final String basename = image.substring(image.lastIndexOf("/"));
+                String extension;
+                if (basename.indexOf('.') >= 0) {
+                    extension = basename.substring(basename.lastIndexOf("."));
+                } else if (mimeType != null) {
+                    extension = "." + mimeType.substring(mimeType.lastIndexOf("/") + 1);
+                } else {
+                    extension = ".jpg";
                 }
-            }, file);
+                final String file = FileSystemStorage.getInstance().getAppHomePath() + "share_" + md5(image) + extension;
+                Log.p("Fetching " + image + " to " + file);
+                ImageDownloadService.createImageToFileSystem(image, new ActionListener() {
+                    public void actionPerformed(ActionEvent evt) {
+                        Log.p(file + " fetched");
+                        peer.show(text, file, mimeType != null ? mimeType : "image/jpg" , services);
+                        if (callback != null) {
+                            callback.actionPerformed(new ActionEvent(file));
+                        }
+                        // delete after share ?
+                    }
+                }, file);
+            } catch (IndexOutOfBoundsException ex) {
+                if (callback != null) {
+                    callback.actionPerformed(new ActionEvent("failed"));
+                }
+            }
         } else {
             peer.show(text, image, mimeType, services);
+            if (callback != null) {
+                callback.actionPerformed(new ActionEvent(image));
+            }
         }
     }
     
